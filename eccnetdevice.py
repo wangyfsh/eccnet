@@ -83,27 +83,16 @@ class eccDevice:
 			v_cmd = '%s -p %d -l %s %s' % (self.remote_cmd, self.port, self.username, self.host)
 			try:
 				self._connect = pexpect.spawn(v_cmd)
-				v_index = self._connect.expect([r'to\scontinue\sconnecting\s\(yes\/no\)\?', r'(P|p)assword\:'], self.timeout1)
-				if v_index == 0:
-					self._connect.sendline('yes')
-				elif v_index == 1:
-					self._connect.sendline(self.password)
-					try:
-						v_index = self._connect.expect([self.prompt], self.timeout1)
-					except pexpect.exceptions.TIMEOUT:
-						self._connect.close()
-						return[0, '登录失败']
+				while 1:
+					v_index = self._connect.expect([r'to\scontinue\sconnecting\s\(yes\/no\)\?', r'(P|p)assword\:'], self.timeout1)
+					if v_index == 0: #处理连接新设备key
+						self._connect.sendline('yes')
+					elif v_index == 1: #处理输入密码
+						self._connect.sendline(self.password)
+						break;
 			except pexpect.exceptions.TIMEOUT:
 				self._connect.close()
-				return[0, '登录失败']
-
-				try:
-					v_index = self._connect.expect([r'(P|p)assword\:'], self.timeout1)
-					self._connect.sendline(self.password)
-					v_index = self._connect.expect([self.prompt], self.timeout1)
-				except  pexpect.exceptions.TIMEOUT:
-					self._connect.close()
-					return[0, '登录失败']			
+				return[0, '登录失败']		
 		elif self.tel_ssh == 'telnet':
 			v_cmd = '%s %s %d' % (self.remote_cmd, self.host, self.port)
 			try:
@@ -241,7 +230,7 @@ class eccDeviceIA(eccDevice):
 		进行相应的交互设置（如提示符、分页符、enable等）。
 	######################################################################
 	'''	
-	def __init__(self, v_tel_ssh, v_host, v_port, v_username, v_password, v_enable_password, v_timeout1 = 5, v_timeout2 = 60):
+	def __init__(self, v_tel_ssh, v_host, v_port, v_username, v_password, v_enable_password, v_timeout1 = 10, v_timeout2 = 60):
 		'''
 		######################################################################
 		名称:
@@ -285,6 +274,26 @@ class eccDeviceIA(eccDevice):
 		self.version2 = ''
 		
 	def connect(self):
+		'''
+		######################################################################
+		名称:
+			connect
+		参数:
+			无
+		返回:
+			数组[flag, str].
+				flag:1, 成功；0，失败
+				如果flag是1，str是''；如果flag是0，str是失败原因
+		用途:
+			连接设备，判断设备类型
+				vendor:		厂商
+				type:		类型
+				model：		型号
+				os：		操作系统类型
+				version1：	版本1
+				version2：	版本2
+		######################################################################
+		'''	
 		v_ret = []
 		v_ret = eccDevice.connect(self)
 		if v_ret[0] == 0:
@@ -334,25 +343,13 @@ class eccDeviceIA(eccDevice):
 				if v_v1: 
 					self.version1 = v_v1[0]
 		if self.vendor != '' and self.os != '':
-			return[1, '']
-			
-		# h3c设备处理
-		eccDevice.command(self, 'display version')
-		if re.findall(r'H3C', self.output_str, re.S): #判断是否是h3c
-			self.vendor = 'h3c'
-			if re.findall(r'Comware', self.output_str, re.S): #判断是否是comware
-				self.os = 'comware'
-				v_v1 = re.findall(r'Version\s+([0-9\.]+)', self.output_str, re.S) #获取版本号
-				if v_v1: 
-					self.version1 = v_v1[0]
-		if self.vendor != '' and self.os != '':
-			return[1, '']			
+			return[1, '']		
 
 		# huawei设备处理
 		eccDevice.command(self, 'display version')
-		if re.findall(r'(H|h)uawei', self.output_str, re.S): #判断是否是h3c
+		if re.findall(r'(H|h)uawei', self.output_str, re.S): #判断是否是huawei
 			self.vendor = 'huawei'
-			if re.findall(r'VRP', self.output_str, re.S): #判断是否是comware
+			if re.findall(r'VRP', self.output_str, re.S): #判断是否是vrp
 				self.os = 'vrp'
 				v_v1 = re.findall(r'Version\s+([0-9\.]+)', self.output_str, re.S) #获取版本号
 				if v_v1: 
